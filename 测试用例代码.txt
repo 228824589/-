@@ -784,6 +784,8 @@ testcase DSTC508()
 
 // 在测试结束时验证所有故障已清除
 teststep("12", "附加测试用例:验证所有故障已清除");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
 T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
 copyDiagnosticResponse(diagResp, desDTC, deslength);
 T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, NOT_USED, DTC_EXPECT_ABSENT);
@@ -801,3 +803,4 @@ T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, NOT_USED, DT
     T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
     T2Log_SetLogFileName_StopLogging();
 }
+
