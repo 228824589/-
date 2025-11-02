@@ -1,0 +1,214 @@
+/@!Encoding:65001/
+
+variables
+{
+// 本文件自包含比较结果枚举，避免跨文件依赖
+enum DTCCompareResult {
+DTC_CMP_TIMEOUT = 0,
+DTC_CMP_PASS = 1,
+DTC_CMP_ERROR = -1
+};
+
+enum DTCExpectPresent {
+DTC_EXPECT_ABSENT = 0, // 期望不存在
+DTC_EXPECT_PRESENT = 1 // 期望存在
+};
+
+enum DTCExpectFailed {
+DTC_EXPECT_HISTORY = 0, // 期望为历史故障（failed=0）
+DTC_EXPECT_CURRENT = 1 // 期望为当前故障（failed=1）
+};
+
+// 缓存最近一次读取的DTC列表，便于一次读取、多次对比
+struct T2DiagCOD_DTC g_DTC_list[2000];
+int g_DTC_num = 0;
+
+// 置 1 可在仿真启动时自动执行批量示例
+const int RUN_DTC_ON_START = 1;
+}
+
+// 一次性读取并缓存DTC列表（默认读取掩码0xFF）
+int ReadDTCList(long mask, long waitMs)
+{
+if (waitMs > 0) {
+testWaitForTimeout(waitMs);
+}
+g_DTC_num = 0;
+T2DiagCOD_Service19_SubFunc02(example_return, mask, g_DTC_list, g_DTC_num, g_T2LOG_DISPLAY_TRUE);
+write("读取DTC完成: 数量=%d, 掩码=0x%02X", g_DTC_num, mask);
+return g_DTC_num;
+}
+
+// 将目标DTC与当前DTC列表进行对比
+// 参数：
+// - target 目标DTC（code[0..2]填入目标故障码）
+// - expectPresent 期望是否存在（DTC_EXPECT_PRESENT / DTC_EXPECT_ABSENT）
+// - expectFailed 若期望存在，则期望状态（DTC_EXPECT_CURRENT / DTC_EXPECT_HISTORY）
+// - waitMs 读取前等待时间（ms），用于给被测系统留出处理时间
+// 返回：
+// - DTC_CMP_PASS: 对比通过
+// - DTC_CMP_TIMEOUT: 期望存在但未找到
+// - DTC_CMP_ERROR: 其他不匹配或错误
+int CMPDTC(struct T2DiagCOD_DTC target, int expectPresent, int expectFailed, long waitMs)
+{
+struct T2DiagCOD_DTC DTC_list[2000];
+int DTC_num = 0;
+long target_pos = -1;
+
+char codeStr[16] = "";
+snprintf(codeStr, elcount(codeStr), "%02X%02X%02X", target.code[0], target.code[1], target.code[2]);
+
+if (waitMs > 0) {
+testWaitForTimeout(waitMs);
+}
+
+// 读取DTC列表（0x19 02 全部状态掩码0xFF）
+T2DiagCOD_Service19_SubFunc02(example_return, 0xFF, DTC_list, DTC_num, g_T2LOG_DISPLAY_TRUE);
+write("当前共获取到 %d 个DTC，开始对比目标=%s", DTC_num, codeStr);
+
+if (T2DiagCDD_CheckDTCInArray(DTC_list, DTC_num, target, target_pos)) {
+int actualFailed = DTC_list[target_pos].failed;
+write("找到目标DTC=%s, failed=%d", codeStr, actualFailed);
+
+if (expectPresent == DTC_EXPECT_ABSENT) {
+  testStepFail("", "期望DTC不存在，但实际找到了目标=%s", codeStr);
+  return DTC_CMP_ERROR;
+}
+
+// 期望存在，比较当前/历史状态
+if (actualFailed == expectFailed) {
+  testStepPass("", "DTC状态匹配: 存在=1, 失败标志=%d (0=历史,1=当前)", actualFailed);
+  return DTC_CMP_PASS;
+} else {
+  testStepFail("", "DTC失败标志不匹配: 期望=%d, 实际=%d (0=历史,1=当前)", expectFailed, actualFailed);
+  return DTC_CMP_ERROR;
+}
+} else {
+// 未找到目标DTC
+if (expectPresent == DTC_EXPECT_PRESENT) {
+testStepFail("", "期望存在目标DTC=%s，但实际未找到", codeStr);
+return DTC_CMP_TIMEOUT;
+} else {
+testStepPass("", "DTC不存在符合期望: 目标=%s", codeStr);
+return DTC_CMP_PASS;
+}
+}
+}
+
+// 基于缓存的对比：先调用 ReadDTCList(...)，然后可多次调用本函数完成批量校验
+int CMPDTC_ExpectCached(struct T2DiagCOD_DTC target, int expectPresent, int expectFailed)
+{
+long target_pos = -1;
+char codeStr[16] = "";
+snprintf(codeStr, elcount(codeStr), "%02X%02X%02X", target.code[0], target.code[1], target.code[2]);
+
+if (g_DTC_num <= 0) {
+testStepFail("", "缓存为空：请先调用 ReadDTCList() 再进行对比，目标=%s", codeStr);
+return DTC_CMP_ERROR;
+}
+
+if (T2DiagCDD_CheckDTCInArray(g_DTC_list, g_DTC_num, target, target_pos)) {
+int actualFailed = g_DTC_list[target_pos].failed;
+write("[缓存] 找到目标DTC=%s, failed=%d", codeStr, actualFailed);
+
+if (expectPresent == DTC_EXPECT_ABSENT) {
+  testStepFail("", "[缓存] 期望DTC不存在，但实际找到了目标=%s", codeStr);
+  return DTC_CMP_ERROR;
+}
+
+if (actualFailed == expectFailed) {
+  testStepPass("", "[缓存] DTC状态匹配: 存在=1, 失败标志=%d (0=历史,1=当前)", actualFailed);
+  return DTC_CMP_PASS;
+} else {
+  testStepFail("", "[缓存] DTC失败标志不匹配: 期望=%d, 实际=%d (0=历史,1=当前)", expectFailed, actualFailed);
+  return DTC_CMP_ERROR;
+}
+} else {
+if (expectPresent == DTC_EXPECT_PRESENT) {
+testStepFail("", "[缓存] 期望存在目标DTC=%s，但实际未找到", codeStr);
+return DTC_CMP_TIMEOUT;
+} else {
+testStepPass("", "[缓存] DTC不存在符合期望: 目标=%s", codeStr);
+return DTC_CMP_PASS;
+}
+}
+}
+
+// 示例：将原 uds_test_004 的核心断言重构为使用 CMPDTC
+testcase uds_test_004_refactored()
+{
+struct T2DiagCOD_DTC target;
+target.code[0] = 0xC4;
+target.code[1] = 0x15;
+target.code[2] = 0x86;
+
+// 进入前等待（如需要）
+testWaitForTimeout(5000);
+
+// 1) 制造故障（示例：拉低车速触发故障，仅为演示）
+teststep("开始制造故障码");
+$PCAN::IBCS::IBS_2_C::BCS_VehSpVD = 0;
+testWaitForTimeout(1500); // 等待上报
+
+// 验证：期望存在，且为当前故障（failed=1）
+CMPDTC(target, DTC_EXPECT_PRESENT, DTC_EXPECT_CURRENT, 0);
+
+// 2) 撤销触发条件
+teststep("开始撤销故障码状态");
+$PCAN::IBCS::IBC_2_C::BCS_VehSpVD = 1;
+testWaitForTimeout(2500);
+
+// 验证：期望仍存在，但为历史故障（failed=0）
+CMPDTC(target, DTC_EXPECT_PRESENT, DTC_EXPECT_HISTORY, 0);
+
+// 3) 如需清除DTC，可在此处调用清除服务后，再验证“期望不存在”
+// 例如：
+// diagSendRequest(cleanDTC);
+// testWaitForTimeout(1500);
+// CMPDTC(target, DTC_EXPECT_ABSENT, DTC_EXPECT_HISTORY, 0);
+}
+
+// 示例：一次读取，多次对比
+testcase uds_test_004_batch()
+{
+struct T2DiagCOD_DTC a, b;
+a.code[0] = 0xC4; a.code[1] = 0x15; a.code[2] = 0x86;
+b.code[0] = 0xAB; b.code[1] = 0xCD; b.code[2] = 0xEF;
+
+// 触发一些场景...
+testWaitForTimeout(2000);
+
+// 一次读取
+ReadDTCList(0xFF, 0);
+
+// 多次期望对比（不再重复读取）
+CMPDTC_ExpectCached(a, DTC_EXPECT_PRESENT, DTC_EXPECT_CURRENT);
+CMPDTC_ExpectCached(b, DTC_EXPECT_ABSENT, DTC_EXPECT_HISTORY);
+}
+
+// 批量主流程：一次读取，多目标对比示例
+void MainTest_DTC_Batch()
+{
+// 1) 构建多个目标 + 期望
+struct T2DiagCOD_DTC t1, t2, t3;
+t1.code[0]=0xC4; t1.code[1]=0x15; t1.code[2]=0x86; // 示例：期望存在且为当前
+t2.code[0]=0xAB; t2.code[1]=0xCD; t2.code[2]=0xEF; // 示例：期望不存在
+t3.code[0]=0x12; t3.code[1]=0x34; t3.code[2]=0x56; // 示例：期望存在历史
+
+// 2) 读取一次
+ReadDTCList(0xFF, 1000);
+
+// 3) 多次对比
+CMPDTC_ExpectCached(t1, DTC_EXPECT_PRESENT, DTC_EXPECT_CURRENT);
+CMPDTC_ExpectCached(t2, DTC_EXPECT_ABSENT, DTC_EXPECT_HISTORY);
+CMPDTC_ExpectCached(t3, DTC_EXPECT_PRESENT, DTC_EXPECT_HISTORY);
+}
+
+// 可选：随仿真启动执行批量示例（将 RUN_DTC_ON_START 置 1 即可启用）
+on start
+{
+if (RUN_DTC_ON_START) {
+write("[DTC] Auto run MainTest_DTC_Batch (once-read multi-compare)");
+MainTest_DTC_Batch();
+}
+}
