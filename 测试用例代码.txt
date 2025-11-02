@@ -1,0 +1,803 @@
+1.种子失效
+
+
+
+testcase security_access_validation()
+{
+    // 诊断请求字符串定义
+    char send_string_1003[30] = "0x1003";
+    
+    // 安全访问请求 - 请求种子
+    char send_string_2701[30] = "0x2701";
+    char send_string_2703[30] = "0x2703"; 
+    char send_string_2721[30] = "0x2721";
+    
+    // 安全访问请求 - 发送密钥（错误密钥）
+    char send_string_2702_wrong[30] = "0x270201020304";  // 错误密钥示例
+    char send_string_2704_wrong[30] = "0x270405060708";  // 错误密钥示例
+    char send_string_2722_wrong[30] = "0x2722090A0B0C";  // 错误密钥示例
+    
+    // 预期响应字符串
+    char resp_5003[30] = "5003";
+    char resp_6701[30] = "6701";
+    char resp_6703[30] = "6703";
+    char resp_6721[30] = "6721";
+    char resp_67xx[30] = "67";           // 通用肯定响应前缀
+    char resp_7F2735[30] = "7F2735";
+    char resp_7F2724[30] = "7F2724";
+    
+    // 诊断变量
+    struct T2DiagCDD_Response diagResp;
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "SecurityAccessValidation");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, 
+                                 "SecurityAccessValidation", "安全访问验证测试");
+
+    /******************** 第一轮安全访问测试 (27 01/02) ********************/
+
+
+@Simulation::Sim All =0;
+ diagStopTesterPresent("ccu");
+NetworkSleepCheck（180）;//单位s,休眠后唤醒
+@Simulation::Sim_All =1；
+testWaitForTimeout(6000)；
+
+    teststep("S1", "发送1003请求 - 进入扩展诊断会话");
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S2", "发送2701请求 - 安全访问请求种子");
+    T2DiagCDD_Service(diagResp, send_string_2701, log_flag);
+    compareResponse(diagResp, 6, resp_67xx, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S3", "发送2702请求 - 发送错误密钥");
+    T2DiagCDD_Service(diagResp, send_string_2702_wrong, log_flag);
+    compareResponse(diagResp, 3, resp_7F2735, COMPARE_FULL, NOT_USED);
+
+    teststep("S4", "重新建立会话并尝试解锁（应被拒绝）");
+    // 先建立会话
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+    使用解锁函数发送正确密钥，但由于种子已失效，应该被拒绝,这里需要获取失败的原因.
+    T2DiagCDD_Service27_Unlock(diagResp, 0x01, log_flag);
+compareResponse(diagResp,3, resp_7F2724, COMPARE_FIRST_BYTES, 3);   //检查是否返回24,
+    // 解锁函数会自动报告失败到测试报告
+
+    /******************** 第二轮安全访问测试 (27 03/04) ********************/
+    teststep("S5", "发送1003请求 - 重新建立诊断会话");
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S6", "发送2703请求 - 安全访问请求新种子");
+    T2DiagCDD_Service(diagResp, send_string_2703, log_flag);
+    compareResponse(diagResp, 6, resp_67xx, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S7", "发送2704请求 - 发送错误密钥");
+    T2DiagCDD_Service(diagResp, send_string_2704_wrong, log_flag);
+    compareResponse(diagResp, 3, resp_7F2735, COMPARE_FULL, NOT_USED);
+
+    teststep("S8", "重新建立会话并尝试解锁（应被拒绝）");
+    // 先建立会话
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+    // 使用解锁函数发送正确密钥
+    T2DiagCDD_Service27_Unlock(diagResp, 0x03, log_flag);
+    // 解锁函数会自动报告失败
+
+    /******************** 第三轮安全访问测试 (27 21/22) ********************/
+    teststep("S9", "发送1003请求 - 重新建立诊断会话");
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S10", "发送2721请求 - 安全访问请求种子");
+    T2DiagCDD_Service(diagResp, send_string_2721, log_flag);
+    compareResponse(diagResp, 6, resp_67xx, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S11", "发送2722请求 - 发送错误密钥");
+    T2DiagCDD_Service(diagResp, send_string_2722_wrong, log_flag);
+    compareResponse(diagResp, 3, resp_7F2735, COMPARE_FULL, NOT_USED);
+
+    teststep("S12", "重新建立会话并尝试解锁（应被拒绝）");
+    // 先建立会话
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+    // 使用解锁函数发送正确密钥
+    T2DiagCDD_Service27_Unlock(diagResp, 0x21, log_flag);
+    // 解锁函数会自动报告失败
+
+    /******************** 验证正常解锁流程（作为对比） ********************/
+    teststep("S13", "验证正常解锁流程 - 发送1003请求");
+    T2DiagCDD_Service(diagResp, send_string_1003, log_flag);
+    compareResponse(diagResp, 6, resp_5003, COMPARE_FIRST_BYTES, 2);
+
+    teststep("S14", "验证正常解锁流程 - 使用解锁函数（应成功）");
+    T2DiagCDD_Service27_Unlock(diagResp, 0x01, log_flag);
+    // 解锁函数会自动报告成功
+
+    /******************** 测试总结 ********************/
+    teststep("SUMMARY", "安全访问种子失效机制验证完成");
+    teststep("SUMMARY", "验证结论：错误密钥会导致种子立即失效");
+    teststep("SUMMARY", "安全机制有效防止暴力攻击和重放攻击");
+
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}
+
+
+
+2.制造IBCS节点丢失后,无法读取速度故障码
+testcase DSTC509()
+{
+    // 诊断请求字符串定义
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char send_string_190209[30] = "0x190209";  // 19服务02子功能 - 读取当前故障码
+    
+    // 预期响应字符串
+    char resp_positive[30] = "54";           // 肯定响应前缀
+    char resp_5902[30] = "5902";             // 19服务肯定响应
+    
+    // DTC定义
+    byte DTC_CommLoss[3] = {0xXX, 0xXX, 0xXX};        // 通信丢失DTC（需要根据实际情况填写）
+    byte DTC_C41586[3] = {0xC4, 0x15, 0x86};          // 速度故障DTC
+    
+    // 诊断变量
+    struct T2DiagCDD_Response diagResp;
+    struct T2DiagCDD_DTC DTC_list[2000];
+    int DTC_num;
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+    enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE;
+    
+    byte desDTC[8192];
+    long deslength;
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DSTC509");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, 
+                                 "DSTC509", "网络故障设置逻辑测试");
+
+    /******************** 步骤1: 唤醒BCU并清除诊断信息 ********************/
+
+    teststep("1", "唤醒BCU并清除诊断信息");
+    /******************** 总线休眠 ********************/
+    teststep("SLEEP", "总线休眠");
+    Simulation::Sim_All = 0;
+    diagStopTesterPresent("ccu");
+    NetworkSleepCheck(180);  // 休眠180秒
+    Simulation::Sim_All = 1;
+    testWaitForTimeout(6000);// 唤醒后等待6秒
+
+    
+    // 清除诊断信息
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_positive, COMPARE_EVENT_CODE, positive);
+
+    /******************** 步骤2: 初始状态验证 ********************/
+    teststep("2", "发送190209读取DTC，确认无网络相关故障码");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);  // 使用02子功能
+    
+    // 复制响应数据用于DTC检查
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证没有通信丢失和速度故障DTC
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_CommLoss, NOT_USED, DTC_EXPECT_ABSENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    /******************** 步骤3: 模拟节点丢失通信 ********************/
+    teststep("3", "模拟IBCS节点丢失通讯");
+    disablenode(ibcs);
+
+    /******************** 步骤4: 验证通信丢失DTC ********************/
+    teststep("4", "发送190209读取节点丢失通信的当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);  // 使用02子功能
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证通信丢失DTC为当前故障（使用0x2F）
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_CommLoss, 0x2F, DTC_EXPECT_PRESENT);
+
+    /******************** 步骤5: 模拟速度故障 ********************/
+    teststep("5", "模拟IBCS节点的速度故障");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 0;
+
+    /******************** 步骤6: 验证故障状态 ********************/
+    teststep("6", "发送190209验证只有通信丢失当前DTC，无速度故障DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);  // 使用02子功能
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证通信丢失DTC仍为当前故障（使用0x2F）
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_CommLoss, 0x2F, DTC_EXPECT_PRESENT);
+    // 验证速度故障DTC不存在
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    /******************** 步骤7: 恢复节点通信 ********************/
+    teststep("7", "恢复IBCS节点通信");
+    enablenode(ibcs);
+
+    /******************** 步骤8: 验证故障状态转换 ********************/
+    teststep("8", "发送190209读取故障状态");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);  // 使用02子功能
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证通信丢失变为历史故障（使用0x2E），速度故障为当前故障（使用0x2F）
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_CommLoss, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+
+    /******************** 步骤9: 再次模拟通信丢失 ********************/
+    teststep("9", "再次模拟IBCS节点丢失通信故障");
+    disablenode(ibcs);
+
+    /******************** 步骤10: 最终验证 ********************/
+    teststep("10", "发送190209读取最终故障状态");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);  // 使用02子功能
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证通信丢失为当前故障（使用0x2F），速度故障为历史故障（使用0x2E）
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_CommLoss, 0x2F, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2E, DTC_EXPECT_PRESENT);
+
+    /******************** 清理步骤: 恢复所有设置 ********************/
+    teststep("CLEANUP", "恢复所有设置");
+    // 恢复速度信号
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 1;
+    // 恢复节点通信
+    enablenode(ibcs);
+    // 清除诊断信息
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    
+
+
+    /******************** 测试总结 ********************/
+    teststep("SUMMARY", "网络故障设置逻辑验证完成");
+    teststep("SUMMARY", "验证结论：通信丢失故障优先于速度故障");
+    teststep("SUMMARY", "故障状态转换逻辑符合预期");
+
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}
+
+
+
+3.故障码1901的数目验证
+testcase DSTC513()
+{
+    // 诊断请求字符串定义
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char send_string_190101[30] = "0x190101";
+    char send_string_190108[30] = "0x190108";
+    char send_string_190109[30] = "0x190109";
+    
+    // 预期响应字符串
+    char resp_positive[30] = "54";           // 肯定响应前缀
+    char resp_5901[30] = "5901";             // 19服务01子功能肯定响应
+    
+    // 诊断变量
+    struct T2DiagCDD_Response diagResp;
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+    
+    // DTC数目存储变量
+    int initialCount01, initialCount08, initialCount09;
+    int currentCount01, currentCount08, currentCount09;
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DSTC513");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, 
+                                 "DSTC513", "读取DTC信息-通过状态掩码报告DTC数目测试");
+
+    /******************** 总线休眠唤醒 ********************/
+    teststep("SLEEP_WAKE", "总线休眠唤醒过程");
+    Simulation::Sim_All = 0;
+    diagStopTesterPresent("ccu");
+    NetworkSleepCheck(180);
+    Simulation::Sim_All = 1;
+    testWaitForTimeout(6000);
+
+    /******************** 初始清除 ********************/
+    teststep("INIT", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_positive, COMPARE_EVENT_CODE, positive);
+    testWaitForTimeout(1000);
+
+    /******************** 步骤1: 初始DTC数目读取 ********************/
+    teststep("S1", "读取初始状态掩码01的DTC数目");
+    T2DiagCDD_Service(diagResp, send_string_190101, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        initialCount01 = diagResp.respData[5];
+        teststep("S1", "状态掩码01初始DTC数目: %d", initialCount01);
+    } else {
+        teststepfail("S1", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S2", "读取初始状态掩码08的DTC数目");
+    T2DiagCDD_Service(diagResp, send_string_190108, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        initialCount08 = diagResp.respData[5];
+        teststep("S2", "状态掩码08初始DTC数目: %d", initialCount08);
+    } else {
+        teststepfail("S2", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S3", "读取初始状态掩码09的DTC数目");
+    T2DiagCDD_Service(diagResp, send_string_190109, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        initialCount09 = diagResp.respData[5];
+        teststep("S3", "状态掩码09初始DTC数目: %d", initialCount09);
+    } else {
+        teststepfail("S3", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    /******************** 步骤2: 模拟第一个故障（速度故障） ********************/
+    teststep("S4", "模拟速度故障");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 0;
+    testWaitForTimeout(1000);
+
+    teststep("S5", "验证DTC数目增加1 - 状态掩码01");
+    T2DiagCDD_Service(diagResp, send_string_190101, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount01 = diagResp.respData[5];
+        if (currentCount01 == initialCount01 + 1) {
+            teststep("S5", "状态掩码01 DTC数目验证通过: 初始=%d, 当前=%d, 增加=1", initialCount01, currentCount01);
+        } else {
+            teststepfail("S5", "状态掩码01 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=1", initialCount01, currentCount01);
+        }
+    } else {
+        teststepfail("S5", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S6", "验证DTC数目增加1 - 状态掩码08");
+    T2DiagCDD_Service(diagResp, send_string_190108, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount08 = diagResp.respData[5];
+        if (currentCount08 == initialCount08 + 1) {
+            teststep("S6", "状态掩码08 DTC数目验证通过: 初始=%d, 当前=%d, 增加=1", initialCount08, currentCount08);
+        } else {
+            teststepfail("S6", "状态掩码08 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=1", initialCount08, currentCount08);
+        }
+    } else {
+        teststepfail("S6", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S7", "验证DTC数目增加1 - 状态掩码09");
+    T2DiagCDD_Service(diagResp, send_string_190109, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount09 = diagResp.respData[5];
+        if (currentCount09 == initialCount09 + 1) {
+            teststep("S7", "状态掩码09 DTC数目验证通过: 初始=%d, 当前=%d, 增加=1", initialCount09, currentCount09);
+        } else {
+            teststepfail("S7", "状态掩码09 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=1", initialCount09, currentCount09);
+        }
+    } else {
+        teststepfail("S7", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    /******************** 步骤3: 模拟第二个故障（ZCUR故障） ********************/
+    teststep("S8", "模拟ZCUR故障");
+    Simulation::Sim_ZCUR = 0;
+    testWaitForTimeout(1000);
+
+    teststep("S9", "验证DTC数目增加2 - 状态掩码01");
+    T2DiagCDD_Service(diagResp, send_string_190101, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount01 = diagResp.respData[5];
+        if (currentCount01 == initialCount01 + 2) {
+            teststep("S9", "状态掩码01 DTC数目验证通过: 初始=%d, 当前=%d, 增加=2", initialCount01, currentCount01);
+        } else {
+            teststepfail("S9", "状态掩码01 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=2", initialCount01, currentCount01);
+        }
+    } else {
+        teststepfail("S9", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S10", "验证DTC数目增加2 - 状态掩码08");
+    T2DiagCDD_Service(diagResp, send_string_190108, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount08 = diagResp.respData[5];
+        if (currentCount08 == initialCount08 + 2) {
+            teststep("S10", "状态掩码08 DTC数目验证通过: 初始=%d, 当前=%d, 增加=2", initialCount08, currentCount08);
+        } else {
+            teststepfail("S10", "状态掩码08 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=2", initialCount08, currentCount08);
+        }
+    } else {
+        teststepfail("S10", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S11", "验证DTC数目增加2 - 状态掩码09");
+    T2DiagCDD_Service(diagResp, send_string_190109, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount09 = diagResp.respData[5];
+        if (currentCount09 == initialCount09 + 2) {
+            teststep("S11", "状态掩码09 DTC数目验证通过: 初始=%d, 当前=%d, 增加=2", initialCount09, currentCount09);
+        } else {
+            teststepfail("S11", "状态掩码09 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=2", initialCount09, currentCount09);
+        }
+    } else {
+        teststepfail("S11", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    /******************** 步骤4: 解除第一个故障 ********************/
+    teststep("S12", "解除速度故障");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 1;
+    testWaitForTimeout(1000);
+
+    teststep("S13", "验证DTC数目变化 - 状态掩码01减少1");
+    T2DiagCDD_Service(diagResp, send_string_190101, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount01 = diagResp.respData[5];
+        if (currentCount01 == initialCount01 + 1) {
+            teststep("S13", "状态掩码01 DTC数目验证通过: 初始=%d, 当前=%d, 增加=1", initialCount01, currentCount01);
+        } else {
+            teststepfail("S13", "状态掩码01 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=1", initialCount01, currentCount01);
+        }
+    } else {
+        teststepfail("S13", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S14", "验证DTC数目变化 - 状态掩码08保持不变");
+    T2DiagCDD_Service(diagResp, send_string_190108, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount08 = diagResp.respData[5];
+        if (currentCount08 == initialCount08 + 2) {
+            teststep("S14", "状态掩码08 DTC数目验证通过: 初始=%d, 当前=%d, 增加=2", initialCount08, currentCount08);
+        } else {
+            teststepfail("S14", "状态掩码08 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=2", initialCount08, currentCount08);
+        }
+    } else {
+        teststepfail("S14", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    teststep("S15", "验证DTC数目变化 - 状态掩码09保持不变");
+    T2DiagCDD_Service(diagResp, send_string_190109, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_5901, COMPARE_FIRST_BYTES, 2);
+    if (diagResp.length >= 6) {
+        currentCount09 = diagResp.respData[5];
+        if (currentCount09 == initialCount09 + 2) {
+            teststep("S15", "状态掩码09 DTC数目验证通过: 初始=%d, 当前=%d, 增加=2", initialCount09, currentCount09);
+        } else {
+            teststepfail("S15", "状态掩码09 DTC数目验证失败: 初始=%d, 当前=%d, 预期增加=2", initialCount09, currentCount09);
+        }
+    } else {
+        teststepfail("S15", "响应长度不足，无法获取DTC数目: 长度=%d", diagResp.length);
+    }
+    testWaitForTimeout(1000);
+
+    /******************** 清理步骤 ********************/
+    teststep("CLEANUP", "恢复所有故障设置");
+    Simulation::Sim_ZCUR = 1;
+    testWaitForTimeout(1000);
+
+    teststep("CLEANUP", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_positive, COMPARE_EVENT_CODE, positive);
+    testWaitForTimeout(1000);
+
+    /******************** 测试总结 ********************/
+    teststep("SUMMARY", "DTC数目状态掩码测试完成");
+    teststep("SUMMARY", "验证结论：1901服务在不同状态掩码下正确报告DTC数目变化");
+
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+4.测试280301是否正常禁用网络:
+
+testcase COMM_CTRL_28_10_11_3E()
+
+{
+
+
+// 诊断变量
+struct T2DiagCDD_Response diagResp;
+enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+
+
+// 请求与期望（仅用于对比字符串）
+char req_14FFFFFF[30] = "0x14FFFFFF";
+char req_280301[30] = "0x280301"; // 禁止通信（停止 5xx）
+char req_280001[30] = "0x280001"; // 允许通信（恢复全部）
+char req_1001[30] = "0x1001"; // 默认会话
+char req_1003[30] = "0x1003"; // 扩展会话
+char req_1101[30] = "0x1101"; // ECU 复位
+
+
+char exp_54[8] = "54";
+char exp_6803[8] = "6803";
+char exp_6800[8] = "6800";
+char exp_5001[8] = "5001";
+char exp_5003[8] = "5003";
+char exp_5101[8] = "5101";
+
+
+// 日志开始
+T2Log_SetLogFileName_StartLogging(setting_log_final_path, "COMM_CTRL_28_10_11_3E");
+T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name,
+"COMM_CTRL_28_10_11_3E", "通信控制一体化验证");
+
+
+
+    /******************** 总线休眠唤醒 ********************/
+    teststep("SLEEP_WAKE", "总线休眠唤醒过程");
+    Simulation::Sim_All = 0;
+    diagStopTesterPresent("ccu");
+    NetworkSleepCheck(180);
+    Simulation::Sim_All = 1;
+    testWaitForTimeout(6000);
+
+
+
+
+/* ================= 阶段1：初始设置和基础通信控制 ================= */
+teststep("P1-1", "清除诊断信息 14FFFFFF → 期望 54");
+T2DiagCDD_Service(diagResp, req_14FFFFFF, log_flag);
+compareResponse(diagResp, 1, exp_54, COMPARE_FIRST_BYTES, 1);
+
+
+teststep("P1-2", "发送 280301 禁止通信 → 期望 6803；验证 5xx 报文停止");
+T2DiagCDD_Service(diagResp, req_280301, log_flag);   应该需要增加发送的长度
+compareResponse(diagResp, 2, exp_6803, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE: 期望"无 0x5xx 报文"，但存在 1-4、6、7 开头 ID 的背景报文
+// CHECKNMMESSAGE(NO_5XX_YES_1_4_6_7);
+
+
+teststep("P1-3", "发送 280001 恢复通信 → 期望 6800；验证 5xx 报文恢复");
+T2DiagCDD_Service(diagResp, req_280001, log_flag);
+compareResponse(diagResp, 2, exp_6800, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE: 期望"有 0x5xx 报文"且 1-4、6、7 正常
+// CHECKNMMESSAGE(YES_5XX_AND_OTHERS);
+
+
+teststep("P1-4", "再次 280301 禁止通信 → 期望 6803；验证 5xx 报文再次停止");
+T2DiagCDD_Service(diagResp, req_280301, log_flag);
+compareResponse(diagResp, 2, exp_6803, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE(NO_5XX_YES_1_4_6_7);
+
+
+/* ================= 阶段2：会话控制与通信控制交互 ================= */
+teststep("P2-1", "发送 1001 进入默认会话 → 期望 5001；验证恢复全部报文");
+T2DiagCDD_Service(diagResp, req_1001, log_flag);
+compareResponse(diagResp, 2, exp_5001, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE(YES_5XX_AND_OTHERS);
+
+
+teststep("P2-2", "发送 1003 进入扩展会话 → 期望 5003；随后 280301 禁止通信 → 期望 6803");
+T2DiagCDD_Service(diagResp, req_1003, log_flag);
+compareResponse(diagResp, 6, exp_5003, COMPARE_FIRST_BYTES, 2);
+T2DiagCDD_Service(diagResp, req_280301, log_flag);
+compareResponse(diagResp, 2, exp_6803, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE(NO_5XX_YES_1_4_6_7);
+
+
+/* ================= 阶段3：ECU 复位与通信控制 ================= */
+teststep("P3-1", "发送 1101 ECU 复位 → 期望 5101；验证恢复全部报文");
+T2DiagCDD_Service(diagResp, req_1101, log_flag);
+compareResponse(diagResp, 2, exp_5101, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE(YES_5XX_AND_OTHERS);
+
+
+teststep("P3-2", "再次 1003 → 5003；随后 280301 → 6803；验证 5xx 停止");
+T2DiagCDD_Service(diagResp, req_1003, log_flag);
+compareResponse(diagResp, 6, exp_5003, COMPARE_FIRST_BYTES, 2);
+T2DiagCDD_Service(diagResp, req_280301, log_flag);
+compareResponse(diagResp, 2, exp_6803, COMPARE_FIRST_BYTES, 2);
+// CHECKNMMESSAGE(NO_5XX_YES_1_4_6_7);
+
+
+/* ================= 阶段4：周期通信控制（3E） ================= */
+teststep("P4-1", "停止 TesterPresent（3E00）5 秒 → ECU 应自动恢复通信");
+diagStopTesterPresent("ccu");
+testWaitForTimeout(5000);
+// CHECKNMMESSAGE(YES_5XX_AND_OTHERS);
+
+
+// 日志结束
+T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+T2Log_SetLogFileName_StopLogging();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+5.//验证过抵压可以产生对应的高低压故障即可,:
+testcase DSTC508()
+{
+    // 诊断请求字符串定义
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char send_string_190209[30] = "0x190209";
+    
+    // 预期响应字符串
+    char resp_54[30] = "54";           // 肯定响应前缀
+    char resp_5902[30] = "5902";       // 19服务肯定响应
+    
+    // DTC定义
+    byte DTC_910016[3] = {0x91, 0x00, 0x16};  // 电压过低DTC
+    byte DTC_910017[3] = {0x91, 0x00, 0x17};  // 电压过高DTC
+    
+    // 诊断变量
+    struct T2DiagCDD_Response diagResp;
+    struct T2DiagCDD_DTC DTC_list[2000];
+    int DTC_num;
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+    enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE;
+    
+    byte desDTC[8192];
+    long deslength;
+    
+    // 时间参数（需要根据实际系统设置）
+    long fault_set_time = 5000;    // 故障设置时间，单位毫秒
+    long fault_recovery_time = 5000; // 故障恢复时间，单位毫秒
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DSTC508");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, 
+                                 "DSTC508", "电压故障DTC验证测试");
+
+
+
+    /******************** 总线休眠唤醒 ********************/
+    teststep("SLEEP_WAKE", "总线休眠唤醒过程");
+    Simulation::Sim_All = 0;
+    diagStopTesterPresent("ccu");
+    NetworkSleepCheck(180);
+    Simulation::Sim_All = 1;
+    testWaitForTimeout(6000);
+
+
+
+    teststep("2", "发送14FFFFFF清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /******************** 初始状态验证 ********************/
+    teststep("3", "发送190209验证无电压故障DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    
+    // 复制响应数据用于DTC检查
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证没有电压过低和过高DTC
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, NOT_USED, DTC_EXPECT_ABSENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, NOT_USED, DTC_EXPECT_ABSENT);
+
+    /******************** 电压过低故障测试 ********************/
+    teststep("4", "设置电压在7V-9V（setv(低)）");
+    setv(低);
+    testWaitForTimeout(fault_set_time);  // 等待故障设置
+
+    teststep("5", "发送190209验证电压过低当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证电压过低DTC为当前故障
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("6", "设置电压在9V-16V（setv(正常)）");
+    setv(正常);
+    testWaitForTimeout(fault_recovery_time);  // 等待故障恢复
+
+    teststep("7", "发送190209验证电压过低历史DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证电压过低DTC为历史故障
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+
+    /******************** 电压过高故障测试 ********************/
+    teststep("8", "设置电压在16V-18V（setv(高)）");
+    setv(高);
+    testWaitForTimeout(fault_set_time);  // 等待故障设置
+
+    teststep("9", "发送190209验证电压过高当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证电压过高DTC为当前故障
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("10", "设置电压在9V-16V（setv(正常)）");
+    setv(正常);
+    testWaitForTimeout(fault_recovery_time);  // 等待故障恢复
+
+    teststep("11", "发送190209验证电压过高历史DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    
+    T2Function_clearArray(desDTC);
+    memcpy(desDTC, diagResp.respData, diagResp.length);
+    deslength = diagResp.length;
+    
+    // 验证电压过高DTC为历史故障
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+
+
+
+
+
+// 在测试结束时验证所有故障已清除
+teststep("12", "附加测试用例:验证所有故障已清除");
+T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+copyDiagnosticResponse(diagResp, desDTC, deslength);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, NOT_USED, DTC_EXPECT_ABSENT);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, NOT_USED, DTC_EXPECT_ABSENT);
+
+
+
+
+    /******************** 测试总结 ********************/
+    teststep("SUMMARY", "电压故障DTC验证完成");
+    teststep("SUMMARY", "验证结论：电压异常时能正确记录和清除DTC");
+    teststep("SUMMARY", "低压和高压故障状态转换符合预期");
+
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}

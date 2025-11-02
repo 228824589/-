@@ -1,0 +1,636 @@
+代码1:
+
+byte DTC_41586[3] = {0xC4, 0x15, 0x86};
+byte DTC_31af87[3] = {0x31, 0xAF, 0x87};
+byte DTC_D84087[3] = {0xD8, 0x40, 0x87}; //关闭ZCUR故障
+
+struct T2DiagCDD_Response example_return;
+struct T2DiagCDD_DTC DTC_list[2000];
+int DTC_num;
+
+enum T2Log_Display not_log_flag = T2LOG_DISPLAY_FALSE;
+
+T2Log_SetLogFileName(startLogging(setting_log_final_path, "DTC015"));
+T2LogWriteTestCaseTitleToLog(B_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DTC015");
+
+teststep("", "使用UDS诊断读取190A获取故障码表");
+T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, g_T2LOG_DISPLAY_TRUE);
+teststep("", "总共获取到了%d个DTC", DTC_num);
+
+teststep("", "使用普通canfd格式发送190A获取故障码列表");
+testwaitForTimeout(2500);
+setBusContext(GetBusNameContext("DCAN"));
+TestJoinMessageEvent(0x7CF);
+SendMessageData(send_string_g_02190A, 10, 0x74F, 8);
+cmpbpte(0x7cf, Resp_string_1000, 150, 1, COMPARE_FIRST_BYTES);
+testwaitForTimeout(20);
+TestJoinMessageEvent(0x7CF);
+SendMessageData(send_string_300014, 10, 0x74F, 8);
+
+代码2:
+byte DTC_41586[3] = {0xC4, 0x15, 0x86};
+byte DTC_31a687[3] = {0x31, 0xAF, 0x87};
+byte DTC_D84087[3] = {0xD8, 0x40, 0x87}; //关闭ZCUR故障
+
+struct T2DiagCDD_Response example_return;
+struct T2DiagCDD_DTC DTC_list[2000];
+int DTC_num;
+
+enum T2Log_Display not_log_flag = T2LOG_DISPLAY_FALSE;
+
+T2Log_SetLogFileName(startLogging(setting_log_final_path, "DTC015"));
+T2LogWriteTestCaseTitleToLog(B_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DTC015");
+
+teststep("", "使用UDS诊断读取190A获取故障码列表");
+T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, g_T2LOG_DISPLAY_TRUE);
+teststep("", "总共获取到了%d个DTC", DTC_num);
+
+teststep("", "使用普通canfd格式发送190A获取故障码列表");
+testwaitForTimeout(2500);
+setBusContext(GetBusNameContext("DCAN"));
+TestJoinMessageEvent(0x7CF);
+SendMessageData(send_string_02190A, 10, 0x74F, 8);
+cmpbyte(0x7cf, Resp_string_1000, 150, 1, COMPARE_FIRST_BYTES);
+testwaitForTimeout(20);
+
+//teststep("", "监控到了首帧开始发送流控帧");
+TestJoinMessageEvent(0x7CF);
+//teststep("", "重新注册7CF监控事件");
+SendMessageData(send_string_300014, 10, 0x74F, 8);
+
+
+代码3:
+testcase uds_diagnostic_002()
+{
+    char send_string[30] = "0x22F1";
+    char check_string[30] = "0x7F2213";
+    struct T2DiagCDD_Response diagResp;
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+    enum T2DiagCDD_Code retCode;
+    
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DTC002");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DTC002", "DTC002");
+    
+    //通用发送服务
+    T2DiagCDD_Service(diagResp, send_string, log_flag);
+    
+    //通用对比响应结果服务
+    compareResponse(diagResp, 3, check_string, 0, NOT_USED);
+    
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    testWaitForTimeout(500);
+    T2Log_SetLogFileName_StopLogging();
+}
+
+
+自定义两个函数的注释:
+// struct T2DiagCDD_Response {
+//     byte respData[4096];  // 诊断响应的数据
+//     int length;           // 诊断后返回数据的长度
+//     long status;          // 诊断后返回的诊断状态：
+//                           // <@retval -1: The response was positive; i.e. there is no error code;
+//                           // <@retval 0: No response has been received yet.
+//                           // <@retval >0: Error code of the negative response;
+//                           // status传入999没有定义，实际情况下使用该值对比
+// };
+
+// mode 0:完全匹配，1:响应值对比，2:部分对比
+char send_string_14FFFFFF[30] = "0x14FFFFFF";
+char Resp_string_C501[30] = "C501";
+
+int compareResponse(struct T2DiagCDD_Response diag_return, int expLen, char check_string[], int mode, int exstatus)
+{
+    // 函数实现
+}
+
+enum CompareMode {
+    COMPARE_FULL = 0,
+    COMPARE_EVENT_CODE = 1,
+    COMPARE_FIRST_BYTES = 2
+};
+
+// 不是一对一监控前端，会全部监控的时间段ID的提交并且获取字节内容进行对比，需要排除其他报文干扰和空报文关闭
+int cmpbyte(long ID, char dest_string[], long maxwaittime, long cmpLength, enum CompareMode mode)
+{
+    // 函数实现
+    // 发送前监控，不能有WAITFIR时间间隔，否则可能监控不到
+    setBusContext(GetBusNameContext("DCAN"));
+    TestJoinMessageEvent(0x7CF);
+    SendMessageData(send_string_061904C41586FF, 10, 0x7DF, 8);
+    cmpbyte(0x7CF, Resp_string_5964, 500, positive, COMPARE_EVENT_CODE);
+}
+
+
+
+比较完整的发送的代码和监控的代码:
+testcase uds_system_015_10()
+{
+    char send_string_1904D84087FF[30] = "0x1904D84087FF";
+    char send_string_1906D84087FF[30] = "0x1906D84087FF";
+    char send_string_190209[30] = "0x190209";
+    char Resp_string_5904[30] = "5904";
+    char Resp_string_5906[30] = "5906";
+    char send_string_1003[30] = "0x1003";
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char Resp_string[30] = "0154AAAAAAAAAAA";
+    
+    byte DTC_41586[3] = {0xC4, 0x15, 0x86};
+    byte DTC_31a687[3] = {0x31, 0xAF, 0x87};
+    byte DTC_D84087[3] = {0xD8, 0x40, 0x87}; // 关闭ZCUR故障
+    
+    byte desDTC[8192];
+    long deslength;
+    
+    struct T2DiagCDD_Response example_return;
+    struct T2DiagCDD_DTC DTC_list[2000];
+    int DTC_num;
+    
+    enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE;
+    
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "uds_system_015");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, "uds_system_015", "uds_system_015");
+    
+    T2DiagCDD_Service(example_return, send_string_1003, log_flag);
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    
+    compareResponse(example_return, NOT_USED, Resp_string, COMPARE_EVENT_CODE, positive);
+    T2DiagCDD_Service19_SubFuncD2(example_return, 0x09, DTC_list, DTC_num, not_log_flag);
+}
+
+
+
+
+在诊断响应报文中寻找是否有目标的DTC,函数已经定义好了,直接使用即可,如果找不到会返回对于的FAIL或者PASS,所以不需要自己对比.
+// 在诊断响应中查找目标DTC:
+// 主要解决诊断结构多次对比故障码问题
+
+// 数据定义
+char send_string_198289[38] = "0x198289";
+char Resp_string_5984[38] = "5984";
+
+byte DTC_31aF87[3] = {0x31, 0xAF, 0x87};  // 关闭ZCUR_5BM_1
+byte DTC_084887[3] = {0xD8, 0x40, 0x87};  // 关闭ZCUR故障
+byte DTC_C41586[3] = {0xC4, 0x15, 0x86};  // 关闭速度
+
+byte desDTC[8192];
+long deslength;
+struct T2DiagCDD_Response example_return;
+struct T2DiagCDD_DTC DTC_list[2000];
+int DTC_num;
+enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE;
+
+// 清空目标数组
+T2Function_clearArray(desDTC);
+
+// 发送查询故障码
+T2DiagCDD_Service19_SubFunc82(example_return, 0x09, DTC_list, DTC_num, not_log_flag);
+
+// 复制响应报文数组
+memcpy(desDTC, example_return.respData, sizeof(example_return.respData));
+
+// 复制数组长度
+deslength = example_return.length;
+
+// 如果不复制到独立结构数组，尽管只对比一次，不稳定。
+
+// 使用下面的对比一次
+// T2DiagDD_checkDTCAndStatusInResponse(diag_return.respData, diag_return.length, DTC_C41586, 0x2F, 1);
+
+// 对比函数说明：
+// 参数1: 响应报文数组 - desDTC
+// 参数2: 响应报文数组长度 - deslength
+// 参数3: 目标故障码 - DTC_C41586
+// 参数4: 期望状态 (0x2F, 0x2E等) 或 NOT_USED=999
+// 参数5: 期待是否出现目标故障码：
+//        DTC_EXPECT_PRESENT = 1 存在
+//        DTC_EXPECT_ABSENT = 0 不存在
+// NOT_USED=999 表示无用参数，故障码不存在时候使用
+
+// 函数调用示例：
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2E, DTC_EXPECT_PRESENT);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+
+
+关于故障码的自动化测试用例:特别是如何查询故障码,如何发送和监控配置,如何查找目标故障码的使用:
+testcase uds_system_0010()
+{
+    int i = 0;
+    
+    // 诊断请求字符串定义
+    char send_string_8501[30] = "0x8501";
+    char send_string_2e0120[50] = "2e0120FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+    char Resp_string2[30] = "62340001";
+    char Resp_string3[30] = "62340003";
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char send_string_223400[30] = "0x223400";
+    
+    // DTC故障码定义
+    byte DTC_C41586[3] = {0xC4, 0x15, 0x86};
+    byte DTC_31af87[3] = {0x31, 0xAF, 0x87};
+    byte DTC_D84087[3] = {0xD8, 0x40, 0x87}; // 关闭ZCUR故障
+    
+    // 诊断相关变量
+    struct T2DiagCDD_Response example_return;
+    struct T2DiagCDD_DTC DTC_list[2000];
+    int DTC_num;
+    enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE;
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DSTC501");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DSTC501", "DSTC501");
+    
+    teststep("", "设置0120,BE268501配置");
+    
+    // 执行诊断服务
+    T2DiagCDD_Service(example_return, send_string_1083, log_flag);
+    T2DiagCDD_Service27_Unlock(diagResp, 0x01, log_flag);
+    T2DiagCDD_Service(example_return, send_string_8501, log_flag);
+    
+    // 验证85服务是否积极响应
+    compareResponse(example_return, NOT_USED, Resp_string, COMPARE_EVENT_CODE, positive);
+    
+    // 循环执行总线休眠测试
+    for(i = 0; i < 3; i++)
+    {
+        setUserMode2Standby();
+        teststep("", "开始制造总线休眠");
+        
+        // 网络休眠需要加上关闭模拟，本地休眠不用
+        Simulation::Sim_All = 0;
+        
+        // 停止诊断保持通信
+        diagstopTesterPresent("CCU");
+        
+        // 检查网络是否进入休眠
+        if(NetworkSleepCheck(180) == -1)
+        {
+            teststepfail("", "总线期待时间内没有进行休眠，测试fail");
+        }
+        
+        // 这里可能还有唤醒总线和验证DTC状态的代码
+        // teststep("", "唤醒总线并验证DTC状态");
+        // T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, not_log_flag);
+        // T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+    }
+    
+    // 清理和结束测试
+    teststep("", "清除诊断信息");
+    T2DiagCDD_Service(example_return, send_string_14FFFFFF, log_flag);
+    
+    // 验证DTC已被清除
+    T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, not_log_flag);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_31af87, NOT_USED, DTC_EXPECT_ABSENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, NOT_USED, DTC_EXPECT_ABSENT);
+    
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}
+
+
+
+
+
+
+
+
+//高低压的故障码不记录其他的通讯故障
+
+
+/**
+ * 复制诊断响应数据到目标数组
+ * @param diagResp - 诊断响应结构体（值传递：复制整个结构体）
+ * @param targetArray - 目标数组（引用传递：修改会同步到原始数组）
+ * @param targetLength - 目标数组长度（引用传递：修改会同步到原始变量）
+ */
+void copyDiagnosticResponse(struct T2DiagCDD_Response diagResp, byte targetArray[], long &targetLength)
+{
+    T2Function_clearArray(targetArray);
+    memcpy(targetArray, diagResp.respData, diagResp.length);
+    targetLength = diagResp.length;
+}
+
+testcase DSTC510()
+{
+    // 诊断请求字符串定义（值传递：字符串在函数调用时复制）
+    char send_string_14FFFFFF[30] = "0x14FFFFFF";
+    char send_string_190209[30] = "0x190209";
+    
+    // 预期响应字符串（值传递）
+    char resp_54[30] = "54";           // 肯定响应前缀
+    char resp_5902[30] = "5902";       // 19服务肯定响应
+    
+    // DTC定义（值传递：数组在函数调用时复制）
+    byte DTC_910016[3] = {0x91, 0x00, 0x16};  // 电压过低DTC
+    byte DTC_910017[3] = {0x91, 0x00, 0x17};  // 电压过高DTC
+    byte DTC_C41586[3] = {0xC4, 0x15, 0x86};  // 速度故障DTC
+    byte DTC_D84087[3] = {0xD8, 0x40, 0x87};  // ZCUR故障DTC
+    
+    // 诊断变量
+    struct T2DiagCDD_Response diagResp;                    // 值传递：整个结构体复制
+    struct T2DiagCDD_DTC DTC_list[2000];                   // 引用传递：数组参数
+    int DTC_num;                                           // 引用传递：使用&符号
+    enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;    // 值传递：枚举类型
+    enum T2Log_Display not_log_flag = g_T2LOG_DISPLAY_FALSE; // 值传递：枚举类型
+    
+    // 局部变量 - 用于copyDiagnosticResponse函数（引用传递）
+    byte desDTC[8192];  // 引用传递：数组参数
+    long deslength;     // 引用传递：使用&符号
+    
+    // 时间参数（值传递）
+    long fault_set_time = 5000;        // 故障设置时间，单位毫秒
+    long fault_recovery_time = 5000;   // 故障恢复时间，单位毫秒
+    long voltage_recovery_delay = 3000; // 电压恢复后等待时间，单位毫秒
+    
+    // 开始日志记录
+    T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DSTC510");
+    T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, 
+                                 "DSTC510", "电压故障优先级验证测试");
+
+    /******************** 初始设置（休眠唤醒） ********************/
+    teststep("1", "CCU休眠");
+    Simulation::Sim_All = 0;
+    diagStopTesterPresent("ccu");
+    NetworkSleepCheck(180);
+
+    teststep("2", "CCU唤醒");
+    Simulation::Sim_All = 1;
+    testWaitForTimeout(6000);
+
+    teststep("3", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /******************** 低电压部分（与三种故障交互） ********************/
+
+    /***** 低电压与故障1（ZCUR故障）交互 *****/
+    teststep("4", "设置电压过低");
+    setv(低);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("5", "验证电压过低当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);  // desDTC和deslength会被更新
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("6", "模拟故障1（ZCUR故障）");
+    Simulation::Sim_ZCUR = 0;
+
+    teststep("7", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);  // 重新复制数据
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("8", "恢复电压正常");
+    setv(正常);
+
+    teststep("9", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("10", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("11", "清除模拟故障1");
+    Simulation::Sim_ZCUR = 1;
+
+    teststep("12", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /***** 低电压与故障2（速度故障）交互 *****/
+    teststep("13", "设置电压过低");
+    setv(低);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("14", "验证电压过低当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("15", "模拟故障2（速度故障）");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 0;
+
+    teststep("16", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("17", "恢复电压正常");
+    setv(正常);
+
+    teststep("18", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("19", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("20", "清除模拟故障2");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 1;
+
+    teststep("21", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /***** 低电压与故障3交互 *****/
+    teststep("22", "设置电压过低");
+    setv(低);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("23", "验证电压过低当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("24", "模拟故障3");
+    // TODO: 添加故障3模拟代码
+
+    teststep("25", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2F, DTC_EXPECT_PRESENT);
+    // 验证没有故障3的DTC
+
+    teststep("26", "恢复电压正常");
+    setv(正常);
+
+    teststep("27", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    // 验证没有故障3的DTC
+
+    teststep("28", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910016, 0x2E, DTC_EXPECT_PRESENT);
+    // 验证有故障3当前DTC
+
+    teststep("29", "清除模拟故障3");
+    // TODO: 添加故障3清除代码
+
+    teststep("30", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /******************** 等待6秒后执行高电压部分 ********************/
+    teststep("WAIT", "等待6秒后执行高电压部分测试");
+    testWaitForTimeout(6000);
+
+    /******************** 高电压部分（与三种故障交互） ********************/
+
+    /***** 高电压与故障1（ZCUR故障）交互 *****/
+    teststep("31", "设置电压过高");
+    setv(高);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("32", "验证电压过高当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("33", "模拟故障1（ZCUR故障）");
+    Simulation::Sim_ZCUR = 0;
+
+    teststep("34", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("35", "恢复电压正常");
+    setv(正常);
+
+    teststep("36", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("37", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_D84087, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("38", "清除模拟故障1");
+    Simulation::Sim_ZCUR = 1;
+
+    teststep("39", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /***** 高电压与故障2（速度故障）交互 *****/
+    teststep("40", "设置电压过高");
+    setv(高);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("41", "验证电压过高当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("42", "模拟故障2（速度故障）");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 0;
+
+    teststep("43", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("44", "恢复电压正常");
+    setv(正常);
+
+    teststep("45", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+
+    teststep("46", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("47", "清除模拟故障2");
+    $PCAN::IBCS::BCS_2_C::BCS_VehspdVD = 1;
+
+    teststep("48", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /***** 高电压与故障3交互 *****/
+    teststep("49", "设置电压过高");
+    setv(高);
+    testWaitForTimeout(fault_set_time);
+
+    teststep("50", "验证电压过高当前DTC");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+
+    teststep("51", "模拟故障3");
+    // TODO: 添加故障3模拟代码
+
+    teststep("52", "验证故障优先级");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2F, DTC_EXPECT_PRESENT);
+    // 验证没有故障3的DTC
+
+    teststep("53", "恢复电压正常");
+    setv(正常);
+
+    teststep("54", "电压恢复后三秒内验证");
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    // 验证没有故障3的DTC
+
+    teststep("55", "电压恢复三秒后验证");
+    testWaitForTimeout(voltage_recovery_delay);
+    T2DiagCDD_Service19_SubFunctionA(diagResp, 0x02, DTC_list, DTC_num, not_log_flag);
+    copyDiagnosticResponse(diagResp, desDTC, deslength);
+    T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_910017, 0x2E, DTC_EXPECT_PRESENT);
+    // 验证有故障3当前DTC
+
+    teststep("56", "清除模拟故障3");
+    // TODO: 添加故障3清除代码
+
+    teststep("57", "清除诊断信息");
+    T2DiagCDD_Service(diagResp, send_string_14FFFFFF, log_flag);
+    compareResponse(diagResp, NOT_USED, resp_54, COMPARE_EVENT_CODE, positive);
+
+    /******************** 测试总结 ********************/
+    teststep("SUMMARY", "电压故障优先级验证完成");
+    teststep("SUMMARY", "验证结论：电压异常故障具有最高优先级");
+    teststep("SUMMARY", "其他故障在电压异常期间和恢复后3秒内不被记录");
+
+    // 结束日志记录
+    T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+    T2Log_SetLogFileName_StopLogging();
+}
+

@@ -1,0 +1,377 @@
+UDS诊断自动化测试框架开发文档
+1. 概述
+本文档详细介绍了UDS诊断自动化测试框架中的核心函数、数据结构和使用方法，主要用于汽车电子控制单元(ECU)的诊断测试自动化。
+
+2. 数据类型和常量定义
+2.1 DTC故障码定义
+c
+// DTC故障码使用3字节数组定义
+byte DTC_41586[3] = {0xC4, 0x15, 0x86};
+byte DTC_31af87[3] = {0x31, 0xAF, 0x87};
+byte DTC_D84087[3] = {0xD8, 0x40, 0x87}; // 关闭ZCUR故障
+2.2 诊断响应结构体
+c
+/**
+ * 诊断响应结构体
+ * 用于存储诊断服务的返回数据
+ */
+struct T2DiagCDD_Response {
+    byte respData[4096];  // 诊断响应的数据缓冲区
+    int length;           // 诊断后返回数据的长度（字节）
+    long status;          // 诊断后返回的诊断状态：
+                          // -1: 积极响应，无错误码
+                          // 0: 尚未收到响应
+                          // >0: 否定响应错误码
+};
+2.3 日志显示标志
+c
+enum T2Log_Display {
+    T2LOG_DISPLAY_FALSE,  // 不显示详细日志
+    T2LOG_DISPLAY_TRUE    // 显示详细日志
+};
+
+// 全局常量定义
+enum T2Log_Display not_log_flag = T2LOG_DISPLAY_FALSE;
+enum T2Log_Display log_flag = g_T2LOG_DISPLAY_TRUE;
+2.4 比较模式枚举
+c
+/**
+ * 响应比较模式定义
+ */
+enum CompareMode {
+    COMPARE_FULL = 0,        // 完全匹配：比较长度和全部字节
+    COMPARE_EVENT_CODE = 1,  // 响应值对比：只比较响应状态，不比较长度
+    COMPARE_FIRST_BYTES = 2  // 部分对比：比较前几个字节和整个响应长度
+};
+3. 核心函数库
+3.1 日志管理函数
+T2Log_SetLogFileName_StartLogging
+c
+/**
+ * 开始日志记录
+ * @param path 日志文件路径
+ * @param testcaseName 测试用例名称
+ */
+T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DTC002");
+T2Log_WriteTestCaseTitleToLog
+c
+/**
+ * 写入测试用例标题到日志
+ * @param fileHandle 日志文件句柄
+ * @param module 模块名称
+ * @param testcaseID 测试用例ID
+ * @param testcaseName 测试用例名称
+ */
+T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DTC002", "DTC002");
+T2Log_WriteTestCaseVerdictToLog
+c
+/**
+ * 写入测试用例结论到日志
+ */
+T2Log_WriteTestCaseVerdictToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name);
+T2Log_SetLogFileName_StopLogging
+c
+/**
+ * 停止日志记录
+ */
+T2Log_SetLogFileName_StopLogging();
+3.2 诊断服务函数
+T2DiagCDD_Service
+c
+/**
+ * 通用诊断服务函数
+ * @param diagResp 诊断响应结构体（输出参数）
+ * @param send_string 诊断请求字符串
+ * @param log_flag 日志标志
+ * 
+ * 使用示例：
+ * T2DiagCDD_Service(diagResp, "0x22F1", log_flag);
+ */
+T2DiagCDD_Service(diagResp, send_string, log_flag);
+T2DiagCDD_Service27_Unlock
+c
+/**
+ * 安全访问解锁服务
+ * @param diagResp 诊断响应结构体
+ * @param securityLevel 安全级别（如0x01）
+ * @param log_flag 日志标志
+ * 
+ * 注意：此函数自动完成完整解锁流程（27 01 → 27 02 或者27 03 → 27 04或者27 21到27 22等）
+ *需要手动先发送诊断1003，失败会自动报告
+ */
+T2DiagCDD_Service27_Unlock(diagResp, 0x01, log_flag);
+T2DiagCDD_Service19_SubFunctionA
+c
+/**
+ * 读取DTC信息服务（19服务）
+ * @param example_return 响应结构体
+ * @param subFunction 子功能码（0xFF=所有DTC，0x09=特定子功能）
+ * @param DTC_list DTC列表输出（二维数组）
+ * @param DTC_num DTC数量输出
+ * @param log_flag 日志标志
+ * 
+ * 注意事项：
+ * - 避免使用190A子功能，可能返回4000+ DTC，超出数组范围
+ * - DTC_list最大支持2000个DTC
+ */
+T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, g_T2LOG_DISPLAY_TRUE);
+T2DiagCDD_Service19_SubFuncD2
+c
+/**
+ * 19服务D2子功能
+ * 用于特定的DTC读取操作
+ */
+T2DiagCDD_Service19_SubFuncD2(example_return, 0x09, DTC_list, DTC_num, not_log_flag);
+3.3 响应比较函数
+compareResponse
+c
+/**
+ * 通用诊断响应比较函数
+ * @param diag_return 诊断响应结构体
+ * @param expLen 期望长度（NOT_USED=999表示忽略此参数）
+ * @param check_string 检查字符串
+ * @param mode 比较模式（0=完全，1=事件码，2=部分）
+ * @param exstatus 期望状态（positive=-1积极响应，0=无响应，>0=否定响应）
+ * 
+ * 比较模式说明：
+ * - 0=完全匹配：比较长度和全部字节
+ * - 1=响应值对比：只比较响应状态，不比较长度
+ * - 2=部分对比：比较前几个字节和整个响应长度
+ */
+
+mode=1（COMPARE_EVENT_CODE）：最后一个参数是期望状态（-1=positive、0=no response、>0=negative）。
+
+mode=2（COMPARE_FIRST_BYTES）：最后一个参数是**“前缀对比的字节数”，而 expLen 表示期望的整条响应长度**
+
+
+
+
+compareResponse(diagResp, 3, "0x7F2213", 0, NOT_USED);
+cmpbyte
+c
+/**
+ * CAN FD报文监控比较函数
+ * @param ID 监控的消息ID
+ * @param dest_string 目标字符串（转换为字节数组比较）
+ * @param maxwaittime 最大等待时间（毫秒）
+ * @param cmpLength 比较长度（字节数）
+ * @param mode 比较模式
+ * 
+ * 注意事项：
+ * - 必须在发送前监控，不能有WAITFIR时间间隔
+ * - 每次监控前必须重新注册事件
+ * - 发送和监控不能阻塞，否则会丢失响应
+ * 
+ * 使用示例：
+ * cmpbyte(0x7CF, "10", 150, 1, COMPARE_FIRST_BYTES); // 监控首帧
+ */
+cmpbyte(0x7CF, Resp_string_1000, 150, 1, COMPARE_FIRST_BYTES);
+3.4 DTC检查专用函数
+T2DiagDD_CheckDTCAndStatusInResponse
+c
+/**
+ * 在诊断响应中检查特定DTC及其状态
+ * @param responseData 响应数据数组
+ * @param dataLength 响应数据长度
+ * @param targetDTC 目标DTC码（3字节数组）
+ * @param expectedStatus 期望状态（0x2F=当前故障，0x2E=历史故障，NOT_USED=999）
+ * @param expectPresent 期望存在性（1=存在，0=不存在）
+ * 
+ * 注意：此函数自动处理结果对比，直接返回PASS/FAIL到测试报告
+ */
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+3.5 直接CAN FD通信函数
+setBusContext
+c
+/**
+ * 设置CAN总线上下文
+ * @param busContext 总线上下文
+ * 
+ * 注意：每次发送CAN FD报文前都必须调用
+ */
+setBusContext(GetBusNameContext("DCAN"));
+TestJoinMessageEvent
+c
+/**
+ * 注册消息监控事件
+ * @param messageID 要监控的消息ID
+ * 
+ * 注意事项：
+ * - 必须在使用cmpbyte监控前调用
+ * - 每次监控都需要重新注册
+ * - 0x7CF是诊断响应ID
+ */
+TestJoinMessageEvent(0x7CF);
+SendMessageData
+c
+/**
+ * 发送CAN FD报文
+ * @param dataString 数据字符串
+ * @param dataLength 数据长度
+ * @param targetID 目标ID
+ * @param dataBytes 数据字节数
+ */
+SendMessageData(send_string_02190A, 10, 0x74F, 8);
+3.6 总线管理函数
+NetworkSleepCheck
+c
+/**
+ * 检查网络休眠状态
+ * @param timeout 超时时间（秒）
+ * @return -1表示在期待时间内没有休眠
+ */
+NetworkSleepCheck(180); // 180秒内监控总线休眠
+diagstopTesterPresent
+c
+/**
+ * 停止诊断保持通信
+ * @param ecuName ECU名称标识
+ */
+diagstopTesterPresent("CCU");
+setUserMode2Standby
+c
+/**
+ * 设置用户模式为待机状态
+ * 用于制造总线休眠条件
+ */
+setUserMode2Standby();
+3.7 工具函数
+T2Function_clearArray
+c
+/**
+ * 清空目标数组
+ * @param array 要清空的数组
+ */
+T2Function_clearArray(desDTC);
+teststep
+c
+/**
+ * 记录测试步骤
+ * @param stepID 步骤ID（可选）
+ * @param description 步骤描述
+ */
+teststep("", "使用UDS诊断读取190A获取故障码表");
+testWaitForTimeout
+c
+/**
+ * 等待指定超时时间
+ * @param milliseconds 毫秒数
+ */
+testWaitForTimeout(500);
+4. 完整工作流程示例
+4.1 诊断服务方式读取DTC
+c
+// 初始化变量
+struct T2DiagCDD_Response example_return;
+struct T2DiagCDD_DTC DTC_list[2000];
+int DTC_num;
+
+// 开始日志
+T2Log_SetLogFileName_StartLogging(setting_log_final_path, "DTC015");
+T2Log_WriteTestCaseTitleToLog(g_T2FUNCTION_LOG_FILE_HANDLE, module_name, "DTC015", "DTC015");
+
+// 读取DTC信息
+teststep("", "使用UDS诊断读取190A获取故障码表");
+T2DiagCDD_Service19_SubFunctionA(example_return, 0xFF, DTC_list, DTC_num, g_T2LOG_DISPLAY_TRUE);
+teststep("", "总共获取到了%d个DTC", DTC_num);
+4.2 直接CAN FD方式通信
+c
+teststep("", "使用普通canfd格式发送190A获取故障码列表");
+testwaitForTimeout(2500);
+
+// 设置总线并注册监控
+setBusContext(GetBusNameContext("DCAN"));
+TestJoinMessageEvent(0x7CF);
+
+// 发送请求并监控响应
+SendMessageData(send_string_g_02190A, 10, 0x74F, 8);
+cmpbyte(0x7CF, Resp_string_1000, 150, 1, COMPARE_FIRST_BYTES);
+
+testwaitForTimeout(20);
+
+// 重新注册监控并发送下一帧
+TestJoinMessageEvent(0x7CF);
+SendMessageData(send_string_300014, 10, 0x74F, 8);
+4.3 稳定的DTC检查流程
+c
+byte desDTC[8192];
+long deslength;
+
+// 清空并复制响应数据确保稳定性
+T2Function_clearArray(desDTC);
+memcpy(desDTC, example_return.respData, sizeof(example_return.respData));
+deslength = example_return.length;
+
+// 执行DTC检查（自动报告结果）
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2F, DTC_EXPECT_PRESENT);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, 0x2E, DTC_EXPECT_PRESENT);
+T2DiagDD_CheckDTCAndStatusInResponse(desDTC, deslength, DTC_C41586, NOT_USED, DTC_EXPECT_ABSENT);
+5. 重要注意事项
+数组大小限制：
+
+避免使用190A服务，可能超出DTC_list[2000]限制
+
+desDTC[8192]缓冲区足够处理大多数响应
+
+时序控制：
+
+必须使用testWaitForTimeout确保响应完成
+
+发送和监控操作不能阻塞
+
+事件注册：
+
+每次监控前必须重新调用TestJoinMessageEvent
+
+CAN FD通信必须设置正确的总线上下文
+
+稳定性保障：
+
+对于多次DTC检查，推荐复制响应数据到独立数组
+
+使用专门的DTC检查函数而非手动解析
+
+错误处理：
+
+安全解锁失败会自动报告
+
+网络休眠检查失败会标记测试失败
+
+日志管理：
+
+合理使用日志标志控制输出详细程度
+
+确保每个测试用例有完整的开始和结束日志
+
+6. 常用诊断服务参考
+服务	功能	示例
+0x10	诊断会话控制	"0x1003"
+0x14	清除诊断信息	"0x14FFFFFF"
+0x19	读取DTC信息	"0x190209"
+0x22	读取数据	"0x22F1"
+0x27	安全访问	"0x2701"
+0x2E	写入数据	"0x2E0120..."
+0x85	控制DTC设置	"0x8501"
+此文档涵盖了UDS诊断自动化测试框架的所有核心功能，开发人员可根据具体测试需求选择合适的函数组合实现自动化测试。
+
+
+
+
+
+
+
+
+
+故障码对比策略:两个开销大概1ms左右,撑死100ms
+// 对于一次性检查，直接使用原结构体
+void checkDTCDirect(struct T2DiagCDD_Response diagResp, byte targetDTC[], int expectedStatus, int expectPresent)
+{
+    T2DiagDD_CheckDTCAndStatusInResponse(diagResp.respData, diagResp.length, targetDTC, expectedStatus, expectPresent);
+}
+
+// 对于需要多次检查的情况，使用复制
+void checkDTCWithCopy(struct T2DiagCDD_Response diagResp, byte targetArray[], long &targetLength, byte targetDTC[], int expectedStatus, int expectPresent)
+{
+    copyDiagnosticResponse(diagResp, targetArray, targetLength);
+    T2DiagDD_CheckDTCAndStatusInResponse(targetArray, targetLength, targetDTC, expectedStatus, expectPresent);
+}
